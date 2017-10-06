@@ -2,13 +2,16 @@ from tastypie.resources import ModelResource
 from content.models import Subject, Standard, Content, Syllabus, ContentTree
 from tastypie.authentication import Authentication
 from tastypie.authorization import Authorization
-# from tastypie.serializers import PrettyJSONSerializer
 from django.utils.timezone import now
 from tastypie.http import HttpUnauthorized, HttpForbidden, HttpNotFound
 from tastypie import fields
 from tastypie.exceptions import BadRequest
 from django.db import IntegrityError
 from tastypie.constants import ALL, ALL_WITH_RELATIONS
+from django.conf.urls import url
+from tastypie.utils import trailing_slash
+from django.core.exceptions import ObjectDoesNotExist
+from mptt.exceptions import InvalidMove
 
 
 class StandardResource(ModelResource):
@@ -70,29 +73,36 @@ class ContentTreeResource(ModelResource):
 			"level": ALL
 		}
 
-
-
+	def dehydrate(self, bundle):
+		bundle.data['name'] = bundle.obj.content.name
+		return bundle	
 		
-	# def post_list(self, request, **kwargs): 
-	# 	from tastypie.serializers import Serializer
-	# 	import json
-	# 	print(json.loads(request.body))
-	# 	obj_generator = Serializer.deserialize(self, request,request.POST.get('data'))
-	# 	for obj in obj_generator:
-	# 		print(obj)
-	# 		print('\n \n \n')
+	def prepend_urls(self):
+		return [
+			url(r"^(?P<resource_name>%s)/move_node%s$" % (self._meta.resource_name, trailing_slash()), self.wrap_view('move_node'), name="api_move_node"),
+		]
 
-	# 	return self.create_response(request, {'message': 'done'})
-	
+	# Creation of the tree structure in the begining.	
 	def obj_create(self, bundle, **kwargs):
+		""" 
+			Will be used only for the creation of the tree, 
+			if bulk creation will have to change this to use mppt_delay_updates 
+		"""
 		def build_tree(data, parent=None):
 			for d in data:
-				content = ContentResource().get_via_uri(d['content'], bundle.request)
+				if 'content' in d:
+					resource_uri = d['content']
+				else:
+					resource_uri = d['resource_uri']
+				
+				content = ContentResource().get_via_uri(resource_uri, bundle.request)
 				node = ContentTree.objects.create(content = content, parent=parent)
+				
 				if 'children' in d:
 					build_tree(d['children'], node)
-		
-		build_tree([bundle.data])
+	
+		return build_tree(bundle.data)	# Assuming data is always an array
+		 
 
 	# def get_child_data(self, obj):
 	# 	data = {
@@ -121,6 +131,41 @@ class ContentTreeResource(ModelResource):
 	# 		to_be_serialized = self.alter_list_data_to_serialize(request,to_be_serialized)
 
 	# 	return self.create_response(request, to_be_serialized)
+
+
+	def move_node(self, request, **kwargs):
+		self.method_check(request, allowed=['patch'])
+		data = self.deserialize(request, request.body, format=request.META.get('CONTENT_TYPE', 'application/json'))
+		target_id = data.get('target_id')
+		node_id = data.get('node_id')
+		postion = data.get('position')
+
+		try:
+			node = ContentTree.objects.get(id=node_id)
+			target = ContentTree.objects.get(id=target_id)
+			node.move_to(target, postion)
+
+		except ObjectDoesNotExist:
+			return self.create_response(request, {
+					'success': False,
+					'reason': 'Node id or target id not found.',
+				}, HttpNotFound )
+
+		except InvalidMove:
+			return self.create_response(request, {
+					'success': False,
+					'reason': 'This move is not allowed',
+				}, HttpForbidden )
+
+		return self.create_response(request, {
+					'success': True,
+					'message': 'Tree updated'
+				})	
+
+
+
+
+
 
 
 
