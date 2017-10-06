@@ -70,6 +70,30 @@ class ContentTreeResource(ModelResource):
 			"level": ALL
 		}
 
+
+
+		
+	# def post_list(self, request, **kwargs): 
+	# 	from tastypie.serializers import Serializer
+	# 	import json
+	# 	print(json.loads(request.body))
+	# 	obj_generator = Serializer.deserialize(self, request,request.POST.get('data'))
+	# 	for obj in obj_generator:
+	# 		print(obj)
+	# 		print('\n \n \n')
+
+	# 	return self.create_response(request, {'message': 'done'})
+	
+	def obj_create(self, bundle, **kwargs):
+		def build_tree(data, parent=None):
+			for d in data:
+				content = ContentResource().get_via_uri(d['content'], bundle.request)
+				node = ContentTree.objects.create(content = content, parent=parent)
+				if 'children' in d:
+					build_tree(d['children'], node)
+		
+		build_tree([bundle.data])
+
 	# def get_child_data(self, obj):
 	# 	data = {
 	# 		'id': obj.id,
