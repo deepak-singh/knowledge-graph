@@ -41,4 +41,4 @@ class ContentTree(MPTTModel):
 		order_insertion_by = []
 
 	def __str__(self):
-		return self.content.name	
+		return self.content.name #+ self.content.syllabus.first().subject.name + self.content.syllabus.first().standard.name
