@@ -86,7 +86,8 @@ class ContentTreeResource(ModelResource):
 	def obj_create(self, bundle, **kwargs):
 		""" 
 			Will be used only for the creation of the tree, 
-			if bulk creation will have to change this to use mppt_delay_updates 
+			if bulk creation will have to change this to use mppt_delay_updates.
+			Parse the input and recursively create the tree.
 		"""
 		def build_tree(data, parent=None):
 			for d in data:
@@ -101,38 +102,39 @@ class ContentTreeResource(ModelResource):
 				if 'children' in d:
 					build_tree(d['children'], node)
 	
-		return build_tree(bundle.data)	# Assuming data is always an array
+		return build_tree(bundle.data)
 		 
 
-	# def get_child_data(self, obj):
-	# 	data = {
-	# 		'id': obj.id,
-	# 		'content_id': obj.content.id,
-	# 		'title': obj.content.title,
-	# 		'body': obj.content.body,
-	# 	}
-	# 	if not obj.is_leaf_node():
-	# 		data['children'] = [self.get_child_data(child) for child in obj.get_children()]
-	# 	return data
+	def get_child_data(self, obj):
+		data = {
+			'id': obj.id,
+			'content_id': obj.content.id,
+			'title': obj.content.name,
+			'body': obj.content.body,
+		}
+		if not obj.is_leaf_node():
+			data['children'] = [self.get_child_data(child) for child in obj.get_children()]
+		return data
 
-	# def get_list(self, request, **kwargs):
-	# 	base_bundle = self.build_bundle(request=request)
-	# 	objects = self.obj_get_list(bundle=base_bundle, **self.remove_api_resource_names(kwargs))
-	# 	sorted_objects = self.apply_sorting(objects, options=request.GET)
-	# 	to_be_serialized = {}
-	# 	from mptt.templatetags.mptt_tags import cache_tree_children
-	# 	objects = cache_tree_children(objects)
-	# 	bundles = []
-	# 	for obj in objects:
-	# 		data = self.get_child_data(obj)
-	# 		bundle = self.build_bundle(data=data, obj=obj, request=request)
-	# 		bundles.append(self.full_dehydrate(bundle))
-	# 		to_be_serialized[self._meta.collection_name] = bundles
-	# 		to_be_serialized = self.alter_list_data_to_serialize(request,to_be_serialized)
+	# Get whole tree making use of cache_tree_children from mptt_tags	
+	def get_list(self, request, **kwargs):
+		base_bundle = self.build_bundle(request=request)
+		objects = self.obj_get_list(bundle=base_bundle, **kwargs)
+		sorted_objects = self.apply_sorting(objects, options=request.GET)
+		to_be_serialized = {}
+		from mptt.templatetags.mptt_tags import cache_tree_children
+		objects = cache_tree_children(objects)
+		bundles = []
+		for obj in objects:
+			data = self.get_child_data(obj)
+			bundle = self.build_bundle(data=data, obj=obj, request=request)
+			bundles.append(self.full_dehydrate(bundle))
+			to_be_serialized[self._meta.collection_name] = bundles
+			to_be_serialized = self.alter_list_data_to_serialize(request,to_be_serialized)
 
-	# 	return self.create_response(request, to_be_serialized)
+		return self.create_response(request, to_be_serialized)
 
-
+	# Move the given node to the given target at a given position	
 	def move_node(self, request, **kwargs):
 		self.method_check(request, allowed=['patch'])
 		data = self.deserialize(request, request.body, format=request.META.get('CONTENT_TYPE', 'application/json'))
