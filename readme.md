@@ -48,3 +48,10 @@ Adjacency list, although much easier to maintain, in RDBMS, will slow down the p
     -   UI: where initial creation is done by dragging the items from a different tree 
 
 
+
+# Instructions:
+  - Setup a database and change settings
+  - pip install -r requirements.txt
+  - python manage.py runserver (run on 8000)
+  - create a super user and login to django admin and create some sample standard, subject, syllabus and content.
+
