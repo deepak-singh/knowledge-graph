@@ -45,7 +45,7 @@ Adjacency list, although much easier to maintain, in RDBMS, will slow down the p
     -   API to get siblings to right of current node.
     -   API to get parent of current node.
     -   API to get only children of current node.
-    -   UI: where initial creation is done by dragging the items from a different tree 
+    -   UI: where initial creation is done by dragging the items from a different tree.
 
 
 
